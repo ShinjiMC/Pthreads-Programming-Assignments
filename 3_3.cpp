@@ -2,12 +2,12 @@
 #include <pthread.h>
 #include <cmath>
 #include <cstdlib>
-#include <mutex> // Biblioteca para usar mutex
+#include <semaphore.h> // Biblioteca para usar semáforos
 
 double a = 0.0, b = 10.0;   // Límites de integración
 int n = 1000000;            // Número total de trapezoides
 double global_result = 0.0; // Resultado compartido
-std::mutex result_mutex;    // Mutex para proteger la variable compartida
+sem_t result_semaphore;     // Semáforo para proteger la variable compartida
 
 // Función f(x) = x^3
 double f(double x)
@@ -40,10 +40,10 @@ void *trapezoidalRule(void *args)
         local_result += (f(x1) + f(x2)) * h / 2.0;
     }
 
-    // Bloquea la sección crítica con un mutex
-    result_mutex.lock();
+    // Bloquea la sección crítica usando semáforo
+    sem_wait(&result_semaphore);
     global_result += local_result;
-    result_mutex.unlock();
+    sem_post(&result_semaphore);
 
     return nullptr;
 }
@@ -60,6 +60,9 @@ int main(int argc, char *argv[])
     pthread_t threads[num_threads];
     ThreadData thread_data[num_threads];
 
+    // Inicialización del semáforo con valor 1
+    sem_init(&result_semaphore, 0, 1);
+
     for (int i = 0; i < num_threads; ++i)
     {
         thread_data[i] = {i, a, b, n, num_threads};
@@ -68,6 +71,9 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < num_threads; ++i)
         pthread_join(threads[i], nullptr);
+
+    // Destruir el semáforo
+    sem_destroy(&result_semaphore);
 
     std::cout << "Resultado aproximado de la integral: " << global_result << std::endl;
 
